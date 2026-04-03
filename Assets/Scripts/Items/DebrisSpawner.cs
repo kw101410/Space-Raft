@@ -58,11 +58,32 @@ public class DebrisSpawner : MonoBehaviour
         int randomIndex = Random.Range(0, debrisPrefabs.Length);
         GameObject debrisObj = Instantiate(debrisPrefabs[randomIndex], finalSpawnPos, Random.rotation);
 
-        // 3. 자원 레이어 설정 (필요 시 코드에서 강제 지정)
-        // debrisObj.layer = LayerMask.NameToLayer("Collectible");
+        // 3. 자원 레이어 자동 설정 (HookSystem이 레이캐스트로 감지하게 함)
+        int collectibleLayerIndex = LayerMask.NameToLayer("Collectible");
+        if (collectibleLayerIndex != -1) // 레이어가 등록되어 있을 때만
+        {
+            debrisObj.layer = collectibleLayerIndex;
+            // 자식 오브젝트(3D 모델)가 있다면 전부 레이어를 바꿔줌
+            foreach (Transform t in debrisObj.GetComponentsInChildren<Transform>(true))
+            {
+                t.gameObject.layer = collectibleLayerIndex;
+            }
+        }
 
-        // 4. Debris 컴포넌트 추가 및 초기화
-        Debris debrisScript = debrisObj.AddComponent<Debris>();
+        // 3-1. 충돌체(Collider) 자동 추가: 만약 새 모델에 박스/메시 콜라이더가 없으면 에임이 안 잡힘
+        if (debrisObj.GetComponentInChildren<Collider>() == null)
+        {
+            // 모델에 맞게 충돌체를 자동으로 생성 (BoxCollider가 가장 무난)
+            debrisObj.AddComponent<BoxCollider>();
+        }
+
+        // 4. Debris 컴포넌트 초기화 (프리팹에 이미 붙어있는 컴포넌트를 사용)
+        Debris debrisScript = debrisObj.GetComponent<Debris>();
+        if (debrisScript == null)
+        {
+            debrisScript = debrisObj.AddComponent<Debris>();
+            Debug.LogWarning($"[{debrisObj.name}] 프리팹에 Debris 컴포넌트가 없습니다! Inspector에서 미리 Debris를 붙이고 ItemData를 넣어주세요.");
+        }
         float randomSpeed = Random.Range(minSpeed, maxSpeed);
         debrisScript.Initialize(driftDirection, randomSpeed);
     }

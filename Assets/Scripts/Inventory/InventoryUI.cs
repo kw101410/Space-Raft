@@ -8,27 +8,68 @@ public class InventoryUI : MonoBehaviour
     
     private List<SlotUI> slotUIs = new List<SlotUI>();
 
-    private void Start()
+    private void OnEnable()
     {
-        // 1. 기존에 남아있을지 모를 자식들 청소 (깔끔하게 시작!)
-        foreach (Transform child in slotParent) {
-            Destroy(child.gameObject);
+        // 1. 인벤토리 매니저가 있는지 확인. (실행 순서 버그로 아직 Awake가 안 된 경우 직접 찾음)
+        if (InventoryManager.Instance == null)
+        {
+            InventoryManager.Instance = FindObjectOfType<InventoryManager>();
+            if (InventoryManager.Instance == null)
+            {
+                Debug.LogError("[UI 에러] 씬에 'InventoryManager'가 존재하지 않습니다! Hierarchy에 Manager 오브젝트를 만들고 스크립트를 붙여주세요.");
+                return;
+            }
         }
 
-        // 2. 인벤토리 매니저의 슬롯 개수만큼 UI 슬롯 생성
-        if (InventoryManager.Instance != null)
-        { // inventorySize(27) + hotbarSize(9) 총 36개 생성
-            int totalSize = InventoryManager.Instance.inventorySize + InventoryManager.Instance.hotbarSize;
-            for (int i = 0; i < totalSize; i++)
+        // 2. 슬롯 UI가 아직 생성되지 않았거나 개수가 맞지 않으면 다시 생성
+        int totalSize = InventoryManager.Instance.inventorySize + InventoryManager.Instance.hotbarSize;
+        if (slotUIs.Count != totalSize)
+        {
+            slotUIs.Clear();
+            foreach (Transform child in slotParent)
             {
-                GameObject newSlot = Instantiate(slotPrefab, slotParent);
-                SlotUI slotUI = newSlot.GetComponent<SlotUI>();
-                if (slotUI != null) slotUIs.Add(slotUI);
+                if (child.gameObject != slotPrefab) Destroy(child.gameObject);
             }
 
-            // 3. 인벤토리 변경 이벤트 구독
-            InventoryManager.Instance.onInventoryChanged += RefreshAllSlots;
-            RefreshAllSlots();
+            if (slotPrefab != null)
+            {
+                // 원본 노출 방지
+                if (slotPrefab.scene.name != null) slotPrefab.SetActive(false);
+
+                for (int i = 0; i < totalSize; i++)
+                {
+                    GameObject newSlot = Instantiate(slotPrefab, slotParent, false); // UI 스케일 박살나는 현상 방지
+                    newSlot.transform.localScale = Vector3.one; // 로컬 스케일 1 강제
+                    newSlot.SetActive(true);
+                    
+                    SlotUI slotUI = newSlot.GetComponent<SlotUI>();
+                    if (slotUI != null) 
+                    {
+                        slotUIs.Add(slotUI);
+                    }
+                    else
+                    {
+                        Debug.LogError("[UI 에러] 할당된 slotPrefab에 'SlotUI' 스크립트가 붙어있지 않습니다! 프리팹을 확인하세요.");
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogError("[UI 에러] InventoryUI 스크립트에 'slotPrefab'이 할당되지 않았습니다! 언리얼/유니티 인스펙터 창을 확인하세요.");
+            }
+        }
+
+        // 3. 이벤트 구독 및 초기 갱신
+        InventoryManager.Instance.onInventoryChanged -= RefreshAllSlots; // 중복 방지
+        InventoryManager.Instance.onInventoryChanged += RefreshAllSlots;
+        RefreshAllSlots();
+    }
+
+    private void OnDisable()
+    {
+        if (InventoryManager.Instance != null)
+        {
+            InventoryManager.Instance.onInventoryChanged -= RefreshAllSlots;
         }
     }
 
@@ -45,11 +86,4 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
-    {
-        if (InventoryManager.Instance != null)
-        {
-            InventoryManager.Instance.onInventoryChanged -= RefreshAllSlots;
-        }
-    }
 }

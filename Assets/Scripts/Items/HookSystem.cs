@@ -105,17 +105,26 @@ public class HookSystem : MonoBehaviour
             return;
         }
 
-        // 플레이어 근처(카메라 위치 아래쪽 등)로 물체를 끌어옴
-        Vector3 targetPos = transform.position + transform.forward * 1.5f; 
+        // 플레이어 몸 근처(카메라 위치)로 직접 끌어오도록 목표점 수정
+        Vector3 targetPos = transform.position + transform.forward * 0.5f; 
         hookedObject.position = Vector3.MoveTowards(hookedObject.position, targetPos, pullSpeed * Time.deltaTime);
 
-        // 너무 가까워지면 자동 해제 및 획득 처리
-        if (Vector3.Distance(hookedObject.position, targetPos) < 0.2f)
+        // 거리가 조금 멀어도(1.5f 이내) 획득 성공하도록 판정을 후하게 줍니다.
+        // 그리고 목표 지점을 targetPos가 아니라 플레이어 중심으로 봅니다.
+        if (Vector3.Distance(hookedObject.position, transform.position) < 2.0f)
         {
             Debris debris = hookedObject.GetComponent<Debris>();
-            if (debris != null && debris.itemData != null)
+            if (debris != null)
             {
-                InventoryManager.Instance.AddItem(debris.itemData, 1);
+                if (debris.itemData != null)
+                {
+                    InventoryManager.Instance.AddItem(debris.itemData, 1);
+                    Debug.Log($"[아이템 획득] {debris.itemData.itemName}이(가) 인벤토리에 들어갔습니다.");
+                }
+                else
+                {
+                    Debug.LogWarning($"[오류] 가져온 물체({hookedObject.name})의 Debris 성분에 ItemData가 비어있습니다! 유니티 에디터에서 해당 프리팹을 확인하세요.");
+                }
             }
             
             Destroy(hookedObject.gameObject);

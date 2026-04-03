@@ -27,10 +27,13 @@ public class Debris : MonoBehaviour
         // 자가 회전 (우주 공간 느낌)
         transform.Rotate(rotationAxis, rotationSpeed * Time.deltaTime);
 
-        // 플레이어(원점)로부터 너무 멀어지면 자동 삭제 (최적화)
-        if (Vector3.Distance(transform.position, Vector3.zero) > lifeDistance)
+        // 플레이어(카메라)로부터 너무 멀어지면 자동 삭제 (최적화)
+        if (Camera.main != null)
         {
-            Destroy(gameObject);
+            if (Vector3.Distance(transform.position, Camera.main.transform.position) > lifeDistance)
+            {
+                Destroy(gameObject);
+            }
         }
     }
 }

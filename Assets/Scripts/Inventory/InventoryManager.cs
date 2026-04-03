@@ -22,6 +22,7 @@ public class InventorySlot
     public bool IsEmpty => item == null;
 }
 
+[DefaultExecutionOrder(-50)] // UI 스크립트보다 무조건 먼저 Awake 되도록 설정
 public class InventoryManager : MonoBehaviour
 {
     public static InventoryManager Instance;
@@ -38,28 +39,46 @@ public class InventoryManager : MonoBehaviour
     private void Awake()
     {
         if (Instance == null) Instance = this;
-        else Destroy(gameObject);
-
-        // 빈 슬롯들로 초기화
-        for (int i = 0; i < inventorySize + hotbarSize; i++)
+        else
         {
-            slots.Add(new InventorySlot());
+            Destroy(gameObject);
+            return;
+        }
+
+        // 인스펙터에서 리스트 크기가 잘못 잡혀있을 수 있으므로 정확히 맞춥니다.
+        int totalSize = inventorySize + hotbarSize;
+        if (slots.Count < totalSize)
+        {
+            for (int i = slots.Count; i < totalSize; i++)
+            {
+                slots.Add(new InventorySlot());
+            }
+        }
+        else if (slots.Count > totalSize)
+        {
+            slots.RemoveRange(totalSize, slots.Count - totalSize);
         }
     }
 
     // 아이템 획득 시 호출되는 함수
     public bool AddItem(ItemData item, int amount = 1)
     {
+        if (item == null || amount <= 0) return false;
+        
+        // 안전 장치: maxStackSize가 0이면 1로 처리하여 무한 루프 방지
+        int stackSize = Mathf.Max(1, item.maxStackSize);
+
         // 1. 이미 인벤토리에 같은 아이템이 있고 더 들어갈 자리가 있는지 확인 (Stacking)
         foreach (var slot in slots)
         {
-            if (slot.item == item && slot.count < item.maxStackSize)
+            if (slot.item == item && slot.count < stackSize)
             {
-                int addAmount = Mathf.Min(amount, item.maxStackSize - slot.count);
+                int addAmount = Mathf.Min(amount, stackSize - slot.count);
                 slot.count += addAmount;
                 amount -= addAmount;
                 if (amount <= 0)
                 {
+                    Debug.Log($"[인벤토리] {item.itemName} 중첩 완료. (현재 개수: {slot.count})");
                     onInventoryChanged?.Invoke();
                     return true;
                 }
@@ -72,13 +91,13 @@ public class InventoryManager : MonoBehaviour
             InventorySlot emptySlot = slots.Find(s => s.IsEmpty);
             if (emptySlot != null)
             {
-                int addAmount = Mathf.Min(amount, item.maxStackSize);
+                int addAmount = Mathf.Min(amount, stackSize);
                 emptySlot.AddItem(item, addAmount);
                 amount -= addAmount;
+                Debug.Log($"[인벤토리] 새 슬롯에 {item.itemName} {addAmount}개 추가.");
             }
             else
             {
-                // 인벤토리 가득 참!
                 Debug.LogWarning("인벤토리가 가득 찼습니다!");
                 onInventoryChanged?.Invoke();
                 return false;
