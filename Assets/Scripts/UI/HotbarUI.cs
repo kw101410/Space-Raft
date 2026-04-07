@@ -8,7 +8,7 @@ public class HotbarUI : MonoBehaviour
     public GameObject slotPrefab;  // 슬롯 프리팹 (InventoryUI와 동일한 것 사용)
     
     // (선택 사항) 현재 선택된 슬롯을 강조해 주기 위한 테두리 투명도 값
-    private Color normalColor = new Color(1, 1, 1, 0.3f); 
+    private Color normalColor = new Color(1, 1, 1, 0.8f); // 0.3 -> 0.8로 올려서 훨씬 잘 보이게 함
     private Color selectedColor = new Color(1, 1, 1, 1.0f); 
 
     private List<SlotUI> hotbarSlots = new List<SlotUI>();
@@ -47,7 +47,7 @@ public class HotbarUI : MonoBehaviour
 
     private void Update()
     {
-        // 시각적으로 하이라이트 갱신 (선택된 1~9번 칸 색깔 바꾸기)
+        // 시각적으로 하이라이트 갱신 (선택된 1~9번 칸 색깔 투명도 다르게 하기)
         if (equipSys == null) equipSys = FindObjectOfType<PlayerEquip>();
         
         if (equipSys != null && bgImages.Count == InventoryManager.Instance.hotbarSize)
@@ -56,8 +56,9 @@ public class HotbarUI : MonoBehaviour
             {
                 if (bgImages[i] != null)
                 {
-                    // 선택된 칸이면 완전 불투명 하얀색, 안 선택된 칸은 약간 투명하게
-                    bgImages[i].color = (equipSys.currentHotbarIndex == i) ? selectedColor : normalColor;
+                    Color c = bgImages[i].color;
+                    c.a = (equipSys.currentHotbarIndex == i) ? 1.0f : 0.8f; 
+                    bgImages[i].color = c;
                 }
             }
         }

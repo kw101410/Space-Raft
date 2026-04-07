@@ -21,9 +21,9 @@ public class InventoryUI : MonoBehaviour
             }
         }
 
-        // 2. 슬롯 UI가 아직 생성되지 않았거나 개수가 맞지 않으면 다시 생성
-        int totalSize = InventoryManager.Instance.inventorySize + InventoryManager.Instance.hotbarSize;
-        if (slotUIs.Count != totalSize)
+        // 2. 핫바를 제외한 순수 인벤토리 칸수(20)만 생성
+        int targetSize = InventoryManager.Instance.inventorySize;
+        if (slotUIs.Count != targetSize)
         {
             slotUIs.Clear();
             foreach (Transform child in slotParent)
@@ -36,7 +36,7 @@ public class InventoryUI : MonoBehaviour
                 // 원본 노출 방지
                 if (slotPrefab.scene.name != null) slotPrefab.SetActive(false);
 
-                for (int i = 0; i < totalSize; i++)
+                for (int i = 0; i < targetSize; i++)
                 {
                     GameObject newSlot = Instantiate(slotPrefab, slotParent, false); // UI 스케일 박살나는 현상 방지
                     newSlot.transform.localScale = Vector3.one; // 로컬 스케일 1 강제
@@ -77,11 +77,14 @@ public class InventoryUI : MonoBehaviour
     {
         var inventorySlots = InventoryManager.Instance.slots;
 
+        int hotbarOffset = InventoryManager.Instance.hotbarSize; // 핫바 칸수만큼 인덱스 건너뛰기
+
         for (int i = 0; i < slotUIs.Count; i++)
         {
-            if (i < inventorySlots.Count)
+            int targetIndex = i + hotbarOffset;
+            if (targetIndex < inventorySlots.Count)
             {
-                slotUIs[i].SetSlot(inventorySlots[i]);
+                slotUIs[i].SetSlot(inventorySlots[targetIndex]);
             }
         }
     }

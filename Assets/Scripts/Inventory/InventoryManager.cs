@@ -28,7 +28,7 @@ public class InventoryManager : MonoBehaviour
     public static InventoryManager Instance;
 
     [Header("Inventory Settings")]
-    public int inventorySize = 27; // 마인크래프트 기본 보관함 크기
+    public int inventorySize = 20; // 목표 인벤토리 크기 (4x5)
     public int hotbarSize = 9;    // 핫바 크기
     
     public List<InventorySlot> slots = new List<InventorySlot>();

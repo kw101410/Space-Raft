@@ -93,6 +93,9 @@ public class PlayerController : MonoBehaviour
 
     private void HandleLook()
     {
+        // 마우스 커서가 고정된 상태가 아니면(예: 인벤토리 오픈 등) 시점을 회전시키지 않음
+        if (Cursor.lockState != CursorLockMode.Locked) return;
+
         if (cameraTransform == null)
         {
             Debug.LogWarning("PlayerController에 Main Camera가 할당되지 않았습니다!");
