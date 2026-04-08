@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a85dc41ee36d44d43a6c307bf7511e76, type: 3}
+  m_Name: Hook Item Data
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemName: Hook
+  icon: {fileID: 21300000, guid: 0bc3f407b5a863c4ea297076f6998c93, type: 3}
+  maxStackSize: 1
+  itemType: 1
+  prefab: {fileID: 919132149155446097, guid: c972508b041c31546b363fc1bb6278a8, type: 3}
+  equipPosition: {x: 0, y: 0, z: 0}
+  equipRotation: {x: 0, y: -90, z: 0}
+  equipScale: {x: 70, y: 70, z: 70}
+  description: 

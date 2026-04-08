@@ -73,7 +73,7 @@ public class HotbarUI : MonoBehaviour
         {
             if (i < slots.Count)
             {
-                hotbarSlots[i].SetSlot(slots[i]);
+                hotbarSlots[i].SetSlot(slots[i], i);
             }
         }
     }

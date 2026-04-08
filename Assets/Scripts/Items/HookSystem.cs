@@ -3,30 +3,34 @@ using UnityEngine.InputSystem;
 
 public class HookSystem : MonoBehaviour
 {
+    private enum HookState { Idle, Thrown, Returning }
+
     [Header("Hook Settings")]
     public Transform cameraTransform;
     public float maxDistance = 30f;
-    public float pullSpeed = 10f;
+    public float throwSpeed = 25f; // 갈고리가 날아가는 속도
+    public float pullSpeed = 15f;  // 돌아오는 속도
+    public float hookHitRadius = 0.5f; // 갈고리 판정 크기 (넉넉하게 설정)
     public LayerMask collectibleLayer;
 
     [Header("Visual Settings")]
     public LineRenderer lineRenderer;
     public float ropeWidth = 0.05f;
-    public Color crosshairColor = Color.white; // 에임 점 색상 조절용
+    public Color crosshairColor = Color.white;
 
-    private bool isHooked = false;
+    private HookState currentState = HookState.Idle;
     private Transform hookedObject;
-    private Vector3 hookPoint;
+    private GameObject thrownHookModel;
+    private Vector3 targetThrowPos;
 
     private InputAction fireAction;
+    private PlayerEquip equipSys;
 
     private void OnGUI()
     {
-        // 화면 정중앙에 4x4 픽셀 크기의 점 찍기 (에이미!)
         int size = 4;
         float posX = Screen.width / 2 - size / 2;
         float posY = Screen.height / 2 - size / 2;
-
         Texture2D texture = Texture2D.whiteTexture;
         GUI.color = crosshairColor;
         GUI.DrawTexture(new Rect(posX, posY, size, size), texture);
@@ -34,7 +38,9 @@ public class HookSystem : MonoBehaviour
 
     private void Awake()
     {
-        // 마우스 왼쪽 클릭 (또는 게임패드 오른쪽 트리거)
+        equipSys = GetComponent<PlayerEquip>();
+        if (equipSys == null) equipSys = FindObjectOfType<PlayerEquip>();
+
         fireAction = new InputAction("Fire", binding: "<Mouse>/leftButton");
         fireAction.AddBinding("<Gamepad>/rightTrigger");
 
@@ -45,107 +51,158 @@ public class HookSystem : MonoBehaviour
             lineRenderer.endWidth = ropeWidth;
             lineRenderer.positionCount = 2;
             lineRenderer.enabled = false;
-            
-            // 기본 하얀색 머티리얼 설정 (분홍색 사각형 방지)
             lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
             lineRenderer.startColor = Color.white;
             lineRenderer.endColor = Color.gray;
         }
     }
 
-    private void OnEnable()
-    {
-        fireAction.Enable();
-    }
-
-    private void OnDisable()
-    {
-        fireAction.Disable();
-    }
+    private void OnEnable() => fireAction.Enable();
+    private void OnDisable() => fireAction.Disable();
 
     private void Update()
     {
-        if (fireAction.WasPressedThisFrame())
+        ItemData currentHeldItem = equipSys != null ? equipSys.GetEquippedItem() : null;
+        bool canUseHook = currentHeldItem != null && currentHeldItem.itemType == ItemType.Tool;
+
+        // 중간에 다른 아이템으로 스위칭 하는 경우, 훅 강제 회수
+        if (currentState != HookState.Idle && (!canUseHook || equipSys.currentEquippedModel == null || thrownHookModel != equipSys.currentEquippedModel))
         {
-            ThrowHook();
+            ResetHookImmediatly();
+            return;
         }
 
-        if (fireAction.IsPressed() && isHooked)
+        switch (currentState)
         {
-            PullObject();
-        }
-        else if (fireAction.WasReleasedThisFrame())
-        {
-            ReleaseHook();
+            case HookState.Idle:
+                if (fireAction.WasPressedThisFrame() && canUseHook)
+                {
+                    StartThrowing();
+                }
+                break;
+
+            case HookState.Thrown:
+                UpdateThrowing();
+                break;
+
+            case HookState.Returning:
+                UpdateReturning();
+                break;
         }
 
         UpdateRope();
     }
 
-    private void ThrowHook()
+    private void StartThrowing()
     {
-        RaycastHit hit;
-        if (Physics.Raycast(cameraTransform.position, cameraTransform.forward, out hit, maxDistance, collectibleLayer))
-        {
-            isHooked = true;
-            hookedObject = hit.transform;
-            hookPoint = hit.point;
-            lineRenderer.enabled = true;
-            
-            // 물체가 움직이지 않도록 잠시 Kinematic 설정을 하거나 이동 로직을 태울 수 있음
-            // 여기서는 단순 이동만 구현
-        }
+        currentState = HookState.Thrown;
+        thrownHookModel = equipSys.currentEquippedModel;
+        
+        // 플레이어 카메라 기준 앞으로 날아갈 목표 좌표 계산
+        targetThrowPos = cameraTransform.position + cameraTransform.forward * maxDistance;
+        
+        // 모델을 플레이어 손에서 분리 (계층 구조 분리)하여 날아가게 만듦
+        thrownHookModel.transform.SetParent(null);
+        
+        lineRenderer.enabled = true;
     }
 
-    private void PullObject()
+    private void UpdateThrowing()
     {
-        if (hookedObject == null)
+        Vector3 prevPos = thrownHookModel.transform.position;
+        
+        // 갈고리가 목표 지점으로 날아감
+        thrownHookModel.transform.position = Vector3.MoveTowards(thrownHookModel.transform.position, targetThrowPos, throwSpeed * Time.deltaTime);
+        
+        // (옵션) 날아가는 동안 빙글빙글 도는 애니메이션 효과
+        thrownHookModel.transform.Rotate(Vector3.right * 720f * Time.deltaTime);
+
+        // 이전 프레임 위치에서 현재 위치까지 부딪히는 물건이 있는지 선(SphereCast)을 그어 탐색
+        float moveDist = Vector3.Distance(prevPos, thrownHookModel.transform.position);
+        RaycastHit hit;
+        if (Physics.SphereCast(prevPos, hookHitRadius, (thrownHookModel.transform.position - prevPos).normalized, out hit, moveDist, collectibleLayer))
         {
-            ReleaseHook();
+            // 물체와 충돌 완료!
+            hookedObject = hit.transform;
+            currentState = HookState.Returning;
+            
+            // 시각적 싱크를 위해 갈고리를 충돌 지점에 맞춤
+            thrownHookModel.transform.position = hit.point;
             return;
         }
 
-        // 플레이어 몸 근처(카메라 위치)로 직접 끌어오도록 목표점 수정
-        Vector3 targetPos = transform.position + transform.forward * 0.5f; 
-        hookedObject.position = Vector3.MoveTowards(hookedObject.position, targetPos, pullSpeed * Time.deltaTime);
-
-        // 거리가 조금 멀어도(1.5f 이내) 획득 성공하도록 판정을 후하게 줍니다.
-        // 그리고 목표 지점을 targetPos가 아니라 플레이어 중심으로 봅니다.
-        if (Vector3.Distance(hookedObject.position, transform.position) < 2.0f)
+        // 클릭을 떼면 중간에 되돌아오게끔 처리 (혹은 최대 거리 도달 시)
+        if (fireAction.WasReleasedThisFrame() || !fireAction.IsPressed() || Vector3.Distance(thrownHookModel.transform.position, targetThrowPos) < 0.1f)
         {
-            Debris debris = hookedObject.GetComponent<Debris>();
-            if (debris != null)
-            {
-                if (debris.itemData != null)
-                {
-                    InventoryManager.Instance.AddItem(debris.itemData, 1);
-                    Debug.Log($"[아이템 획득] {debris.itemData.itemName}이(가) 인벤토리에 들어갔습니다.");
-                }
-                else
-                {
-                    Debug.LogWarning($"[오류] 가져온 물체({hookedObject.name})의 Debris 성분에 ItemData가 비어있습니다! 유니티 에디터에서 해당 프리팹을 확인하세요.");
-                }
-            }
-            
-            Destroy(hookedObject.gameObject);
-            ReleaseHook();
+            currentState = HookState.Returning;
         }
     }
 
-    private void ReleaseHook()
+    private void UpdateReturning()
     {
-        isHooked = false;
+        Transform handPoint = equipSys.handPoint;
+        if (handPoint == null) return;
+
+        // 다시 플레이어 손으로 당겨옴
+        thrownHookModel.transform.position = Vector3.MoveTowards(thrownHookModel.transform.position, handPoint.position, pullSpeed * Time.deltaTime);
+        
+        // 잡은 물체가 있다면 갈고리 모델을 따라 같이 옴
+        if (hookedObject != null)
+        {
+            hookedObject.position = thrownHookModel.transform.position;
+        }
+
+        // 손에 도착하면(거리가 가까워지면) 회수 완료
+        if (Vector3.Distance(thrownHookModel.transform.position, handPoint.position) < 1.0f)
+        {
+            if (hookedObject != null)
+            {
+                Debris debris = hookedObject.GetComponent<Debris>();
+                if (debris != null && debris.itemData != null)
+                {
+                    InventoryManager.Instance.AddItem(debris.itemData, 1);
+                    Debug.Log($"[아이템 획득] {debris.itemData.itemName} 얻음!");
+                }
+                Destroy(hookedObject.gameObject);
+            }
+
+            ResetHookImmediatly();
+        }
+    }
+
+    private void ResetHookImmediatly()
+    {
+        currentState = HookState.Idle;
         hookedObject = null;
         lineRenderer.enabled = false;
+
+        // 갈고리 모델을 다시 플레이어의 손 안(자식)으로 원상복구
+        if (thrownHookModel != null && equipSys != null && equipSys.handPoint != null)
+        {
+            thrownHookModel.transform.SetParent(equipSys.handPoint);
+            
+            // ItemData에 저장했던 예쁜 장착 스케일/각도/위치로 리셋
+            ItemData currentItem = equipSys.GetEquippedItem();
+            if (currentItem != null)
+            {
+                thrownHookModel.transform.localPosition = currentItem.equipPosition;
+                thrownHookModel.transform.localRotation = Quaternion.Euler(currentItem.equipRotation);
+            }
+        }
+        thrownHookModel = null;
     }
 
     private void UpdateRope()
     {
-        if (isHooked && hookedObject != null)
+        // 선(밧줄) 그리기 애니메이션
+        if (currentState != HookState.Idle && thrownHookModel != null && equipSys.handPoint != null)
         {
-            // 플레이어 손 위치(혹은 카메라 아래)에서 물체까지 라인 그림
-            lineRenderer.SetPosition(0, transform.position + transform.right * 0.3f - transform.up * 0.2f);
-            lineRenderer.SetPosition(1, hookedObject.position);
+            lineRenderer.SetPosition(0, equipSys.handPoint.position);
+            lineRenderer.SetPosition(1, thrownHookModel.transform.position);
+        }
+        else
+        {
+            lineRenderer.enabled = false;
         }
     }
 }

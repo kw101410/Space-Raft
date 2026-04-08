@@ -134,6 +134,7 @@ GameObject:
   - component: {fileID: 103222775}
   - component: {fileID: 103222774}
   - component: {fileID: 103222780}
+  - component: {fileID: 103222781}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -295,13 +296,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HookSystem
   cameraTransform: {fileID: 330585546}
   maxDistance: 30
+  throwSpeed: 25
   pullSpeed: 10
+  hookHitRadius: 0.5
   collectibleLayer:
     serializedVersion: 2
     m_Bits: 64
   lineRenderer: {fileID: 0}
   ropeWidth: 0.05
   crosshairColor: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &103222781
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 103222773}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46a27de1d244d4c448fdf14feb760dd5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerEquip
+  handPoint: {fileID: 0}
+  currentEquippedModel: {fileID: 0}
+  currentEquippedItem: {fileID: 0}
+  currentHotbarIndex: 0
 --- !u!1 &292158958
 GameObject:
   m_ObjectHideFlags: 0
@@ -1249,6 +1268,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DebrisSpawner
   debrisPrefabs:
   - {fileID: 8533969201746807063, guid: db5fc41892ddf2646adeac05510db93d, type: 3}
+  - {fileID: 3248861036682509121, guid: 001d747d6f67b224fb86a590341108de, type: 3}
   minSpawnRate: 1
   maxSpawnRate: 3
   spawnDistance: 30
@@ -1286,6 +1306,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InventoryManager
   inventorySize: 20
   hotbarSize: 9
+  startingItems:
+  - {fileID: 11400000, guid: 0f8b887338b88ca44aaaa9a45af87eeb, type: 2}
   slots:
   - item: {fileID: 0}
     count: 0

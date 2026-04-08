@@ -31,6 +31,9 @@ public class InventoryManager : MonoBehaviour
     public int inventorySize = 20; // 목표 인벤토리 크기 (4x5)
     public int hotbarSize = 9;    // 핫바 크기
     
+    [Header("Starting Items")]
+    public List<ItemData> startingItems = new List<ItemData>(); // 게임 시작 시 기본 제공 아이템
+    
     public List<InventorySlot> slots = new List<InventorySlot>();
 
     public delegate void OnInventoryChanged();
@@ -57,6 +60,18 @@ public class InventoryManager : MonoBehaviour
         else if (slots.Count > totalSize)
         {
             slots.RemoveRange(totalSize, slots.Count - totalSize);
+        }
+    }
+
+    private void Start()
+    {
+        // 게임 시작 시 초기 아이템 지급
+        foreach (var item in startingItems)
+        {
+            if (item != null)
+            {
+                AddItem(item, 1);
+            }
         }
     }
 
@@ -106,5 +121,42 @@ public class InventoryManager : MonoBehaviour
 
         onInventoryChanged?.Invoke();
         return true;
+    }
+
+    // 아이템 슬롯 맞교환 또는 합치기 (드래그 앤 드롭에 사용)
+    public void SwapSlots(int indexA, int indexB)
+    {
+        if (indexA < 0 || indexB < 0 || indexA >= slots.Count || indexB >= slots.Count || indexA == indexB)
+            return;
+
+        InventorySlot slotA = slots[indexA];
+        InventorySlot slotB = slots[indexB];
+
+        // 같은 아이템인 경우 합치기 시도
+        if (!slotA.IsEmpty && !slotB.IsEmpty && slotA.item == slotB.item)
+        {
+            int stackSize = Mathf.Max(1, slotA.item.maxStackSize);
+            int total = slotA.count + slotB.count;
+            if (total <= stackSize)
+            {
+                slotB.count = total;
+                slotA.item = null;
+                slotA.count = 0;
+            }
+            else
+            {
+                slotB.count = stackSize;
+                slotA.count = total - stackSize;
+            }
+        }
+        else
+        {
+            // 평범한 교환
+            InventorySlot temp = slots[indexA];
+            slots[indexA] = slots[indexB];
+            slots[indexB] = temp;
+        }
+
+        onInventoryChanged?.Invoke();
     }
 }

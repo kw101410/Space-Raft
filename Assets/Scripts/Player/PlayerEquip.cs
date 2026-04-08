@@ -5,7 +5,9 @@ public class PlayerEquip : MonoBehaviour
 {
     [Header("Equip Settings")]
     public Transform handPoint; // 플레이어 카메라 앞쪽의 아이템을 들 위치
-    private GameObject currentEquippedModel; // 현재 손에 들고 있는 3D 모델
+    public GameObject currentEquippedModel; // 현재 손에 들고 있는 3D 모델
+    
+    [HideInInspector] public ItemData currentEquippedItem; // 현재 장착 중인 실제 아이템 데이터
     
     public int currentHotbarIndex = 0; // 선택된 핫바 슬롯 번호 (0~8)
 
@@ -71,16 +73,43 @@ public class PlayerEquip : MonoBehaviour
             Destroy(currentEquippedModel);
         }
 
+        // 현재 아이템 데이터 갱신
+        currentEquippedItem = selectedSlot.item;
+
         // 해당 슬롯에 아이템이 있고, 그 아이템에 '손에 들 프리팹(모델)'이 지정되어 있다면 생성
         if (selectedSlot.item != null && selectedSlot.item.prefab != null && selectedSlot.count > 0)
         {
             currentEquippedModel = Instantiate(selectedSlot.item.prefab, handPoint);
-            currentEquippedModel.transform.localPosition = Vector3.zero;
-            currentEquippedModel.transform.localRotation = Quaternion.identity;
+            currentEquippedModel.transform.localPosition = selectedSlot.item.equipPosition;
+            currentEquippedModel.transform.localRotation = Quaternion.Euler(selectedSlot.item.equipRotation);
             
-            // 만약 물리엔진(Rigidbody)이나 기존 기능 찌꺼기가 남은 거라면 무기 상태로 꺼주기 (선택)
+            // 기존 에셋들의 경우 equipScale이 (0,0,0)으로 초기화되어 투명해지는 현상 방지
+            if (selectedSlot.item.equipScale == Vector3.zero)
+            {
+                currentEquippedModel.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                currentEquippedModel.transform.localScale = selectedSlot.item.equipScale;
+            }
+            
+            // 만약 물리엔진(Rigidbody)이나 찌꺼기가 남은 거라면 무기 상태로 꺼주기
             Rigidbody rb = currentEquippedModel.GetComponent<Rigidbody>();
             if (rb != null) Destroy(rb);
+            
+            Collider col = currentEquippedModel.GetComponent<Collider>();
+            if (col != null) col.enabled = false; // 손에 든 물체는 충돌 방지
         }
+    }
+
+    // 외부(다른 스크립트)에서 현재 손에 들고 있는 아이템이 뭔지 물어볼 때 쓰는 안전한 함수
+    public ItemData GetEquippedItem()
+    {
+        // 핫바 인덱스에 아이템이 1개라도 있는지 확인
+        if (InventoryManager.Instance != null && InventoryManager.Instance.slots[currentHotbarIndex].count > 0)
+        {
+            return currentEquippedItem;
+        }
+        return null;
     }
 }

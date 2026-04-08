@@ -84,7 +84,7 @@ public class InventoryUI : MonoBehaviour
             int targetIndex = i + hotbarOffset;
             if (targetIndex < inventorySlots.Count)
             {
-                slotUIs[i].SetSlot(inventorySlots[targetIndex]);
+                slotUIs[i].SetSlot(inventorySlots[targetIndex], targetIndex);
             }
         }
     }
