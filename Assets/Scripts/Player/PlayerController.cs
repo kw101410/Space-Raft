@@ -30,6 +30,13 @@ public class PlayerController : MonoBehaviour
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+        
+        // 에디터에서 Main Camera를 직접 할당하지 않았을 경우 자동으로 찾아주는 편의 기능
+        if (cameraTransform == null && Camera.main != null)
+        {
+            cameraTransform = Camera.main.transform;
+        }
+
         if (cameraTransform != null)
         {
             playerCamera = cameraTransform.GetComponent<Camera>();
@@ -102,7 +109,9 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        Vector2 lookInput = lookAction.ReadValue<Vector2>() * mouseSensitivity * Time.deltaTime;
+        // New Input System의 Mouse Delta 구조상 Time.deltaTime을 곱하면 프레임별로 감도가 크게 요동치거나 너무 느려집니다.
+        // 기존 감도와 비슷한 느낌을 위해 0.01f 정도의 낮은 고정 배율을 사용합니다.
+        Vector2 lookInput = lookAction.ReadValue<Vector2>() * (mouseSensitivity * 0.01f);
 
         xRotation -= lookInput.y;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);

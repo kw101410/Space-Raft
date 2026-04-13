@@ -21,6 +21,10 @@ public class HookSystem : MonoBehaviour
     private HookState currentState = HookState.Idle;
     private Transform hookedObject;
     private GameObject thrownHookModel;
+    private GameObject hookRootModel; // 현재 장착된 훅의 전체 파츠 (최상위)
+    private Transform headParent;     // Head의 원래 부모 위치
+    private Vector3 originalHeadLocalPos;
+    private Quaternion originalHeadLocalRot;
     private Vector3 targetThrowPos;
 
     private InputAction fireAction;
@@ -66,7 +70,7 @@ public class HookSystem : MonoBehaviour
         bool canUseHook = currentHeldItem != null && currentHeldItem.itemType == ItemType.Tool;
 
         // 중간에 다른 아이템으로 스위칭 하는 경우, 훅 강제 회수
-        if (currentState != HookState.Idle && (!canUseHook || equipSys.currentEquippedModel == null || thrownHookModel != equipSys.currentEquippedModel))
+        if (currentState != HookState.Idle && (!canUseHook || equipSys.currentEquippedModel == null || hookRootModel != equipSys.currentEquippedModel))
         {
             ResetHookImmediatly();
             return;
@@ -96,12 +100,29 @@ public class HookSystem : MonoBehaviour
     private void StartThrowing()
     {
         currentState = HookState.Thrown;
-        thrownHookModel = equipSys.currentEquippedModel;
+        hookRootModel = equipSys.currentEquippedModel;
+        
+        // "Head" 자식을 찾아 날아갈 물체로 지정 (나머지 몸체는 플레이어 손에 남음)
+        Transform headTransform = hookRootModel.transform.Find("Head");
+        if (headTransform != null)
+        {
+            thrownHookModel = headTransform.gameObject;
+            headParent = headTransform.parent;
+            originalHeadLocalPos = headTransform.localPosition;
+            originalHeadLocalRot = headTransform.localRotation;
+        }
+        else
+        {
+            thrownHookModel = hookRootModel;
+            headParent = hookRootModel.transform.parent;
+            originalHeadLocalPos = hookRootModel.transform.localPosition;
+            originalHeadLocalRot = hookRootModel.transform.localRotation;
+        }
         
         // 플레이어 카메라 기준 앞으로 날아갈 목표 좌표 계산
         targetThrowPos = cameraTransform.position + cameraTransform.forward * maxDistance;
         
-        // 모델을 플레이어 손에서 분리 (계층 구조 분리)하여 날아가게 만듦
+        // 오브젝트를 부모에서 분리하여 독립적으로 날아가게 만듦
         thrownHookModel.transform.SetParent(null);
         
         lineRenderer.enabled = true;
@@ -140,11 +161,15 @@ public class HookSystem : MonoBehaviour
 
     private void UpdateReturning()
     {
-        Transform handPoint = equipSys.handPoint;
-        if (handPoint == null) return;
+        // 돌아올 목표 위치는 Head가 원래 달려있던 위치(총구 끝 등)
+        Vector3 targetReturnPos = equipSys.handPoint.position;
+        if (headParent != null)
+        {
+            targetReturnPos = headParent.TransformPoint(originalHeadLocalPos);
+        }
 
-        // 다시 플레이어 손으로 당겨옴
-        thrownHookModel.transform.position = Vector3.MoveTowards(thrownHookModel.transform.position, handPoint.position, pullSpeed * Time.deltaTime);
+        // 다시 당겨옴
+        thrownHookModel.transform.position = Vector3.MoveTowards(thrownHookModel.transform.position, targetReturnPos, pullSpeed * Time.deltaTime);
         
         // 잡은 물체가 있다면 갈고리 모델을 따라 같이 옴
         if (hookedObject != null)
@@ -152,8 +177,8 @@ public class HookSystem : MonoBehaviour
             hookedObject.position = thrownHookModel.transform.position;
         }
 
-        // 손에 도착하면(거리가 가까워지면) 회수 완료
-        if (Vector3.Distance(thrownHookModel.transform.position, handPoint.position) < 1.0f)
+        // 제자리에 도착하면(거리가 가까워지면) 회수 완료
+        if (Vector3.Distance(thrownHookModel.transform.position, targetReturnPos) < 1.0f)
         {
             if (hookedObject != null)
             {
@@ -176,28 +201,41 @@ public class HookSystem : MonoBehaviour
         hookedObject = null;
         lineRenderer.enabled = false;
 
-        // 갈고리 모델을 다시 플레이어의 손 안(자식)으로 원상복구
-        if (thrownHookModel != null && equipSys != null && equipSys.handPoint != null)
+        // 갈고리 모듈(Head)을 원래 부모 및 기존 위치, 회전값으로 부착 원상복구
+        if (thrownHookModel != null)
         {
-            thrownHookModel.transform.SetParent(equipSys.handPoint);
-            
-            // ItemData에 저장했던 예쁜 장착 스케일/각도/위치로 리셋
-            ItemData currentItem = equipSys.GetEquippedItem();
-            if (currentItem != null)
+            if (headParent != null)
             {
-                thrownHookModel.transform.localPosition = currentItem.equipPosition;
-                thrownHookModel.transform.localRotation = Quaternion.Euler(currentItem.equipRotation);
+                thrownHookModel.transform.SetParent(headParent);
+                thrownHookModel.transform.localPosition = originalHeadLocalPos;
+                thrownHookModel.transform.localRotation = originalHeadLocalRot;
+            }
+            else
+            {
+                // 인벤토리 스위칭 등으로 손잡이(Body)가 먼저 파괴된 상태라면 분리된 Head도 마저 파괴
+                Destroy(thrownHookModel);
             }
         }
+        
         thrownHookModel = null;
+        hookRootModel = null;
+        headParent = null;
     }
 
     private void UpdateRope()
     {
         // 선(밧줄) 그리기 애니메이션
-        if (currentState != HookState.Idle && thrownHookModel != null && equipSys.handPoint != null)
+        if (currentState != HookState.Idle && thrownHookModel != null)
         {
-            lineRenderer.SetPosition(0, equipSys.handPoint.position);
+            // 발사 시작 위치를 'Body' 로 잡기 (없으면 handPoint 대체)
+            Vector3 startPos = equipSys.handPoint != null ? equipSys.handPoint.position : transform.position;
+            if (hookRootModel != null)
+            {
+                Transform bodyTransform = hookRootModel.transform.Find("Body");
+                if (bodyTransform != null) startPos = bodyTransform.position;
+            }
+
+            lineRenderer.SetPosition(0, startPos);
             lineRenderer.SetPosition(1, thrownHookModel.transform.position);
         }
         else

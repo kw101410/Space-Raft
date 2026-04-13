@@ -160,7 +160,7 @@ MonoBehaviour:
   gravity: -9.81
   mouseSensitivity: 15
   fieldOfView: 65
-  cameraTransform: {fileID: 330585546}
+  cameraTransform: {fileID: 0}
 --- !u!143 &103222775
 CharacterController:
   m_ObjectHideFlags: 0

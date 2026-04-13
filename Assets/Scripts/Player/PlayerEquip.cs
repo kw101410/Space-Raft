@@ -93,12 +93,32 @@ public class PlayerEquip : MonoBehaviour
                 currentEquippedModel.transform.localScale = selectedSlot.item.equipScale;
             }
             
-            // 만약 물리엔진(Rigidbody)이나 찌꺼기가 남은 거라면 무기 상태로 꺼주기
-            Rigidbody rb = currentEquippedModel.GetComponent<Rigidbody>();
-            if (rb != null) Destroy(rb);
+            // 프리팹(FBX 등 모델) 내부에 포함된 쓸데없는 카메라나 라이트 제거
+            Camera[] extraCameras = currentEquippedModel.GetComponentsInChildren<Camera>();
+            foreach (var cam in extraCameras)
+            {
+                Destroy(cam.gameObject);
+            }
+
+            Light[] extraLights = currentEquippedModel.GetComponentsInChildren<Light>();
+            foreach (var light in extraLights)
+            {
+                Destroy(light.gameObject);
+            }
+
+            // 만약 물리엔진(Rigidbody)이 있다면 모두 제거 (자식 포함)
+            Rigidbody[] rbs = currentEquippedModel.GetComponentsInChildren<Rigidbody>();
+            foreach (var rb in rbs)
+            {
+                Destroy(rb);
+            }
             
-            Collider col = currentEquippedModel.GetComponent<Collider>();
-            if (col != null) col.enabled = false; // 손에 든 물체는 충돌 방지
+            // 손에 든 물체는 플레이어와 충돌하지 않도록 모든 콜라이더 비활성화 (자식 포함)
+            Collider[] colliders = currentEquippedModel.GetComponentsInChildren<Collider>();
+            foreach (var collider in colliders)
+            {
+                collider.enabled = false;
+            }
         }
     }
 
